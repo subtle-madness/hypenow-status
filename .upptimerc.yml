@@ -1,0 +1,136 @@
+# 하입나우 서비스 상태 페이지 설정 — https://status.hypenow.io
+# 점검은 GitHub Actions가 5분마다 바깥에서 접속해 확인한다(우리 서버와 독립).
+# 설정 문서: https://upptime.js.org/docs/configuration
+owner: subtle-madness
+repo: hypenow-status
+
+# 장애 이슈 담당자(자동 장애 이슈가 열리면 배정)
+assignees:
+  - chlwoomin
+
+sites:
+  # 고객이 여는 웹 화면(Vercel)
+  - name: 웹사이트
+    slug: website
+    url: https://www.hypenow.io
+    maxResponseTime: 5000
+  # 서버 프로그램 생존 확인 — 데이터베이스는 보지 않는다(was HealthController)
+  - name: 서비스 서버
+    slug: api
+    url: https://api.hypenow.io/health
+    maxResponseTime: 5000
+    __dangerous__body_down_if_text_missing: '"status":"ok"'
+  # 로그인 없이 열리는 랜딩 통계 — 서버에서 데이터베이스까지 읽히는지 확인
+  - name: 데이터 조회
+    slug: data
+    url: https://api.hypenow.io/v1/stats
+    maxResponseTime: 5000
+    __dangerous__body_down_if_text_missing: '"success":true'
+
+# 저장소 설명·토픽·홈페이지 자동 수정 끄기(직접 관리)
+skipDescriptionUpdate: true
+skipTopicsUpdate: true
+
+status-website:
+  cname: status.hypenow.io
+  logoUrl: https://www.hypenow.io/android-chrome-192x192.png
+  favicon: https://www.hypenow.io/android-chrome-192x192.png
+  faviconSvg: https://www.hypenow.io/android-chrome-192x192.png
+  name: 하입나우 서비스 상태
+  introTitle: "**하입나우** 서비스 상태"
+  introMessage: 하입나우의 주요 기능이 정상인지 5분마다 확인해 보여드려요. 장애가 생기면 이곳에 상황과 해결 소식을 올려요.
+  theme: light
+  # 브랜드 색 — 테마 CSS보다 뒤에 적용되도록 선택자 우선순위를 높인다
+  customHeadHtml: >-
+    <meta name="theme-color" content="#ec4899" />
+    <style>
+    html:root {
+      --body-background-color: #fdf2f8;
+      --body-text-color: #1f2937;
+      --nav-border-bottom-color: #fbcfe8;
+      --nav-current-border-bottom-color: #ec4899;
+      --card-border-color: #fbcfe8;
+      --error-button-border-color: #d61f7f;
+      --error-button-background-color: #ec4899;
+      --submit-button-border-color: #d61f7f;
+      --submit-button-background-color: #ec4899;
+    }
+    a { color: #d61f7f; }
+    </style>
+  navbar:
+    - title: 서비스 상태
+      href: /
+    - title: 하입나우 바로가기
+      href: https://www.hypenow.io
+
+i18n:
+  locale: ko-KR
+  activeIncidents: 진행 중인 장애
+  allSystemsOperational: 모든 서비스가 정상이에요
+  incidentReport: "장애 #$NUMBER 보기 →"
+  activeIncidentSummary: $DATE 시작 · 소식 $POSTS건
+  incidentTitle: 장애 $NUMBER 상세
+  incidentDetails: 장애 상세
+  incidentFixed: 해결됨
+  incidentOngoing: 진행 중
+  incidentOpenedAt: 시작
+  incidentClosedAt: 해결
+  incidentViewOnGitHub: GitHub에서 보기·구독하기
+  incidentCommentSummary: $DATE · $AUTHOR
+  incidentBack: ← 전체 장애 목록
+  pastIncidents: 지난 장애
+  pastIncidentsResolved: $MINUTES분 만에 해결 · 소식 $POSTS건
+  liveStatus: 현재 상태
+  overallUptime: "전체 가동률: $UPTIME"
+  overallUptimeTitle: 전체 가동률
+  averageResponseTime: "평균 응답 시간: $TIMEms"
+  averageResponseTimeTitle: 평균 응답 시간
+  sevelDayResponseTime: 최근 7일 응답 시간
+  responseTimeMs: 응답 시간(ms)
+  up: 정상
+  down: 장애
+  degraded: 느림
+  ms: ms
+  loading: 불러오는 중
+  navGitHub: GitHub
+  footer: 이 페이지는 [공개 저장소]($REPO)에서 [Upptime](https://upptime.js.org)으로 만들었어요.
+  rateLimitExceededTitle: 잠시 후 다시 열어 주세요
+  rateLimitExceededIntro: 한 시간 동안 볼 수 있는 횟수를 넘었어요. 조금 기다렸다가 다시 열거나, GitHub 개인 토큰을 넣으면 바로 이어서 볼 수 있어요.
+  rateLimitExceededWhatDoesErrorMean: 왜 이런 화면이 나오나요?
+  rateLimitExceededErrorMeaning: 이 페이지는 GitHub에서 실시간 상태를 받아와요. GitHub은 접속 주소 하나당 한 시간에 60번까지만 허용하는데, 그 횟수를 다 썼어요.
+  rateLimitExceededErrorHowCanFix: 어떻게 하면 되나요?
+  rateLimitExceededErrorFix: 한 시간 뒤에 다시 열면 횟수가 다시 채워져요. GitHub 개인 토큰을 넣으면 한 시간에 5,000번까지 볼 수 있어요.
+  rateLimitExceededGeneratePAT: 개인 토큰 만드는 방법 보기
+  rateLimitExceededHasSet: 개인 토큰이 설정되어 있어요.
+  rateLimitExceededRemoveToken: 토큰 지우기
+  rateLimitExceededGitHubPAT: GitHub 개인 토큰
+  rateLimitExceededCopyPastePAT: 토큰을 붙여 넣어 주세요
+  rateLimitExceededSaveToken: 토큰 저장
+  errorTitle: 문제가 생겼어요
+  errorIntro: 최신 상태를 불러오지 못했어요.
+  errorText: 잠시 후 다시 시도해 주세요.
+  errorHome: 처음 화면으로
+  pastScheduledMaintenance: 지난 정기 점검
+  scheduledMaintenance: 정기 점검 예정
+  scheduledMaintenanceSummaryStarted: $DATE 시작 · $DURATION분 예정
+  scheduledMaintenanceSummaryStarts: $DATE 시작 예정 · $DURATION분
+  startedAt: 시작
+  startsAt: 시작 예정
+  duration: 소요 시간
+  durationMin: $DURATION분
+  incidentCompleted: 완료
+  incidentScheduled: 예정
+  duration24H: 24시간
+  duration7D: 7일
+  duration30D: 30일
+  duration1Y: 1년
+  durationAll: 전체
+  # README 요약표 문구
+  completeOutage: 🟥 전체 장애
+  partialOutage: 🟧 일부 장애
+  degradedPerformance: 🟨 일부 느림
+  status: 상태
+  history: 기록
+  responseTime: 응답 시간
+  uptime: 가동률
+  url: 주소
