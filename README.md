@@ -26,4 +26,4 @@ GitHub Actions가 5분마다 아래 주소에 바깥에서 접속해 정상 여�
 <!--start: docs-->
 <!--end: docs-->
 
-[Upptime](https://upptime.js.org)(MIT) 기반.
+[Upptime](https://upptime.js.org)(MIT) 기반. 템플릿 자동 갱신은 껐다(조직 정책상 기본 토큰이 워크플로 파일을 못 고치고, 갱신이 워크플로에 적은 권한 설정을 지운다). 버전은 워크플로의 `upptime/uptime-monitor@v1.46.5`에 고정.
