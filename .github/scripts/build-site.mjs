@@ -78,7 +78,7 @@ export const parseMaintenance = (body) => {
   return found;
 };
 
-const stripTag = (t) => String(t ?? '').replace(/^\s*\[(장애|점검)\]\s*/, '').trim();
+const stripTag = (t) => String(t ?? '').replace(/^\s*\[(장애|점검|정기 점검)\]\s*/, '').trim();
 
 const serviceOf = (issue, sites) => {
   const labels = labelNames(issue);
@@ -230,10 +230,10 @@ const loadIssues = async (nowMs) => {
   const closed = await apiAll(`/repos/${repo}/issues?state=closed&since=${since}`, token);
   const trustByPermission = permissionChecker(repo, token);
   await trustByPermission([...open, ...closed]);
-  // 열린 장애 공지의 댓글만 가져온다(사람 댓글만 쓴다).
+  // 열린 장애 공지의 댓글만 가져온다(사람 댓글만 쓴다). 자동 장애 공지에 팀원이 단 소식도 싣는다.
   const comments = {};
   for (const i of open) {
-    if (!isTrustedIssue(i) || isBotIssue(i) || !labelNames(i).includes('status')) continue;
+    if (!isTrustedIssue(i) || !labelNames(i).includes('status')) continue;
     comments[i.number] = await apiAll(`/repos/${repo}/issues/${i.number}/comments`, token);
     await trustByPermission(comments[i.number]);
   }
