@@ -200,6 +200,21 @@ test('렌더: 정상 화면, GitHub API 호출 코드·스크립트 없음, 마�
   assert.ok(!html.includes('—'));
 });
 
+test('렌더: 문의는 메일로, 로고는 페이지 안에 싣고 하입나우 서버 주소를 부르지 않음', () => {
+  const summary = sites.map((s) => ({ ...s, status: 'up', dailyMinutesDown: {} }));
+  const html = render({ sites, summary, metas: {}, data: { active: [], past: [], maintenance: [] }, comments: {}, nowMs: NOW, lastCheckMs: NOW });
+  assert.ok(html.includes('<a href="mailto:support@hypenow.io">support@hypenow.io</a>로 알려 주세요.'));
+  assert.ok(html.includes('<a class="btn" href="mailto:support@hypenow.io">메일 보내기</a>'));
+  assert.ok(!html.includes('cs-inquiry'));
+  assert.ok(!html.includes('api.hypenow.io'));
+  // 이미지는 전부 data URI(외부 이미지 요청 없음)
+  const srcs = [...html.matchAll(/<img[^>]*\ssrc="([^"]+)"/g)].map((m) => m[1]);
+  assert.equal(srcs.length, 2);
+  assert.ok(srcs.every((u) => u.startsWith('data:image/png;base64,')));
+  // 90일 막대는 말풍선용 날짜·상태를 갖는다
+  assert.ok(/<span class="(ok|none)" data-tip="\d+\/\d+ (정상|기록 없음)"><\/span>/.test(html));
+});
+
 test('렌더: 묶인 장애 한 카드, 진행 단계·접두어 제거·api 증상만', () => {
   const tdata = classify([
     botIssue({ number: 2, title: '🛑 a is down', created_at: '2026-11-10T04:00:00Z', labels: [{ name: 'status' }, { name: 'api' }] }),

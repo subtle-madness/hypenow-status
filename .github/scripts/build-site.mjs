@@ -11,11 +11,18 @@ import { pathToFileURL } from 'node:url';
 const TZ = 'Asia/Seoul';
 const SITE_NAME = '하입나우 서비스 상태';
 const INTRO = '하입나우의 주요 기능이 정상인지 5분마다 확인해 보여드려요. 문제가 생기면 이곳에 상황과 해결 소식을 올려요.';
-const LOGO = 'https://www.hypenow.io/android-chrome-192x192.png';
 const HOME_URL = 'https://www.hypenow.io';
 const CNAME = 'status.hypenow.io';
-// 고객 문의 창구(나중에 바꿀 수 있게 상수로 둔다)
-const HELP_URL = 'https://www.hypenow.io/cs-inquiry';
+// 고객 문의 메일(나중에 바꿀 수 있게 상수로 둔다)
+const SUPPORT_EMAIL = 'support@hypenow.io';
+// 로고는 하입나우 프론트(celfit-front public/icon-logo-pink-star.png·main-color-text-logo.png)를 줄여 페이지에 직접 싣는다.
+// 하입나우 사이트가 멈춰도 이 페이지의 로고는 보여야 하므로 다른 주소에서 불러오지 않는다.
+const asset = (f) => `data:image/png;base64,${readFileSync(new URL(`./assets/${f}`, import.meta.url)).toString('base64')}`;
+const LOGO_STAR = asset('logo-star.png');
+const LOGO_WORDMARK = asset('logo-wordmark.png');
+// 글꼴은 하입나우와 같은 조합(영문·숫자 Poppins, 한글 Noto Sans KR, 수치 Geist Mono)을 공개 CDN에서 받는다.
+// 못 받으면 시스템 글꼴로 그대로 보인다(하입나우 서버에는 기대지 않는다).
+const FONT_CSS = 'https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Noto+Sans+KR:wght@400;500;700&family=Poppins:wght@400;500;600;700&display=swap';
 const TRUSTED = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
 const BOT_LOGIN = 'github-actions[bot]';
 const DAY = 86400000;
@@ -449,6 +456,17 @@ export const buildHero = ({ incidents, maintenance, nowMs, progress = {}, sites 
 const SVC_LABEL = { up: '정상', degraded: '느림', down: '문제 있음', maint: '점검 중' };
 const SVC_DOT = { up: 'ok', degraded: 'warn', down: 'bad', maint: 'info' };
 
+// 상태 아이콘(하입나우 화면이 쓰는 lucide 계열 선 굵기에 맞춘 단순 SVG). 색은 CSS currentColor로 준다.
+const ALERT = '<path d="M10 5.6v5" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><circle cx="10" cy="14.2" r="1.25" fill="#fff"/>';
+const ICON_BODY = {
+  ok: '<path d="M6.1 10.3l2.6 2.6 5.2-5.4" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>',
+  bad: ALERT,
+  warn: ALERT,
+  info: '<path d="M10 5.9V10l2.7 1.7" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+};
+const icon = (cls) => `<svg class="ic ${cls}" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="10" fill="currentColor"/>${ICON_BODY[cls]}</svg>`;
+const CHEVRON = '<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5L10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
 export const render = ({ sites, summary, metas, data, comments, nowMs, lastCheckMs }) => {
   const bySlug = Object.fromEntries(summary.map((s) => [s.slug, s]));
   const ongoingMaint = data.maintenance.filter((m) => m.ongoing);
@@ -491,126 +509,211 @@ export const render = ({ sites, summary, metas, data, comments, nowMs, lastCheck
     return { site: s, sum, st };
   });
 
-  const box = (label, inner) => `<div class="box"><b>${esc(label)}</b>${inner}</div>`;
+  // 카드 안의 한 줄: 왼쪽 이름표, 오른쪽 내용(좁은 화면에서는 위아래로 쌓인다)
+  const field = (label, inner) => `<div class="field"><div class="lbl">${esc(label)}</div><div class="val">${inner}</div></div>`;
+  const list = (items) => `<ul class="list">${items.map((s) => `<li>${esc(s)}</li>`).join('')}</ul>`;
 
   const maintCard = (m) => {
     const sameDay = kstDate(m.start) === kstDate(m.end);
-    const when = `${fmtMdW(m.start)} ${fmtHm(m.start)} ~ ${sameDay ? '' : fmtMdW(m.end) + ' '}${fmtHm(m.end)} · 약 ${fmtMinutes((m.end - m.start) / 60000)}`;
-    const items = messageSlugs(m.expectedDown).map((s) => `<li>${esc(svcText(s, sites).maint)}</li>`).join('');
+    const when = `${fmtMdW(m.start)} ${fmtHm(m.start)} ~ ${sameDay ? '' : fmtMdW(m.end) + ' '}${fmtHm(m.end)}`;
+    const dur = `약 ${fmtMinutes((m.end - m.start) / 60000)}`;
+    const items = messageSlugs(m.expectedDown).map((s) => svcText(s, sites).maint);
     const extra = stripHtml(m.bodyHtml) ? `<div class="prose">${cleanHtml(m.bodyHtml)}</div>` : '';
-    const inner = (items ? `<ul>${items}</ul>` : '') + extra;
-    return `<div class="card inc">
-<div class="top"><h3>${esc(m.title)}</h3><span class="pill info">${m.ongoing ? '점검 중' : '예정'}</span></div>
-${box('언제', esc(when))}
-${inner ? box('이 시간에는', inner) : ''}
-</div>`;
+    const inner = (items.length ? list(items) : '') + extra;
+    return `<article class="card mt">
+<div class="card-h"><h3>${esc(m.title)}</h3><span class="pill info">${m.ongoing ? '점검 중' : '예정'}</span></div>
+${field('언제', `<span class="when">${esc(when)}</span><span class="dur">${esc(dur)}</span>`)}
+${inner ? field('이 시간에는', inner) : ''}
+</article>`;
   };
-  const maintSection = (list, h) => (list.length ? `<h2>${h}</h2>\n${list.map(maintCard).join('\n')}` : '');
+  const section = (title, body, meta = '') => `<section class="sec">
+<div class="sec-h"><h2>${esc(title)}</h2>${meta ? `<span class="sec-m">${esc(meta)}</span>` : ''}</div>
+${body}
+</section>`;
+  const maintSection = (list2, h) => (list2.length ? section(h, list2.map(maintCard).join('\n')) : '');
 
   const incidentCard = ({ inc, pr }) => {
     const color = inc.kind === 'down' ? 'bad' : 'warn';
     const stage = pr.stage;
-    const steps = STAGES.map((n, k) => `<div class="step${k <= stage ? ' done' : ''}${k === stage ? ' now' : ''}"><i></i>${n}</div>`).join('');
+    const steps = STAGES.map((n, k) => `<li class="${[k <= stage ? 'done' : '', k === stage ? 'now' : ''].filter(Boolean).join(' ')}">${n}</li>`).join('');
     const symptoms = inc.kind === 'down' ? [...new Set(messageSlugs(inc.slugs).flatMap((s) => svcText(s, sites).symptoms))] : [];
-    const tl = pr.entries.slice().reverse().map((e, k) => `<li${k === 0 ? ' class="cur"' : ''}><span class="s">${STAGES[e.stage]}</span><span class="t">${esc(fmtWhen(e.at, nowMs))}</span><div class="tx">${cleanHtml(e.html)}</div></li>`);
+    const entry = (cur, st, at, html) => `<li${cur ? ' class="cur"' : ''}><div class="tl-h"><b>${st}</b>${at}</div><div class="tx">${html}</div></li>`;
+    const tl = pr.entries.slice().reverse().map((e, k) => entry(k === 0, STAGES[e.stage], `<time>${esc(fmtWhen(e.at, nowMs))}</time>`, cleanHtml(e.html)));
     const startText = inc.bot ? `<p>${esc(BOT_START_TEXT)}</p>` : cleanHtml(inc.bodyHtml);
-    const startAt = inc.created != null ? `<span class="t">${esc(fmtWhen(inc.created, nowMs))}</span>` : '';
-    tl.push(`<li${pr.entries.length ? '' : ' class="cur"'}><span class="s">확인 중</span>${startAt}<div class="tx">${startText}</div></li>`);
-    return `<div class="card inc ${color}">
-<div class="top"><h3>${esc(inc.title.replace(/^지금 /, ''))}</h3><span class="pill ${stage === 3 ? 'ok' : color}">${STAGES[stage]}</span></div>
-<div class="steps">${steps}</div>
-${symptoms.length ? box('이렇게 보일 수 있어요', `<ul>${symptoms.map((s) => `<li>${esc(s)}</li>`).join('')}</ul>`) : ''}
-<ul class="tl">${tl.join('\n')}</ul>
-</div>`;
+    const startAt = inc.created != null ? `<time>${esc(fmtWhen(inc.created, nowMs))}</time>` : '';
+    tl.push(entry(!pr.entries.length, '확인 중', startAt, startText));
+    return `<article class="card inc ${color}">
+<div class="card-h"><h3>${esc(inc.title.replace(/^지금 /, ''))}</h3><span class="pill ${stage === 3 ? 'ok' : color}">${STAGES[stage]}</span></div>
+<ol class="steps" aria-label="진행 단계">${steps}</ol>
+${symptoms.length ? field('이렇게 보일 수 있어요', list(symptoms)) : ''}
+${field('진행 소식', `<ol class="tl">${tl.join('\n')}</ol>`)}
+</article>`;
   };
 
-  const svcRows = rows.map(({ site, sum, st }, idx) => {
+  const svcRows = rows.map(({ site, sum, st }) => {
     const t = svcText(site.slug, sites);
     const { cells, pct } = aggregate90(sum.dailyMinutesDown, metas[site.slug]?.startTime, nowMs, st === 'degraded');
-    const bars = cells.map((c) => `<span class="${c.cls === 'ok' ? '' : c.cls}" title="${esc(c.tip)}"></span>`).join('');
+    // 막대에 올리면 날짜·장애 시간을 보여 준다(CSS 말풍선, 스크립트 없음)
+    const bars = cells.map((c) => `<span class="${c.cls}" data-tip="${esc(c.tip)}"></span>`).join('');
     const mid = pct == null ? '기록 없음' : `최근 90일 ${fmtPct(pct)}% 정상`;
-    return `<div class="svc"><div class="row"><div class="name"><span class="dot ${SVC_DOT[st]}"></span>${esc(t.name)}</div><span class="st ${SVC_DOT[st]}">${SVC_LABEL[st]}</span></div>
-<div class="desc">${esc(t.desc)}</div>
+    const cls = SVC_DOT[st];
+    return `<div class="svc">
+<div class="svc-h">${icon(cls)}<div class="svc-n"><b>${esc(t.name)}</b><span>${esc(t.desc)}</span></div><span class="st ${cls}">${SVC_LABEL[st]}</span></div>
 <div class="bars" role="img" aria-label="최근 90일 상태">${bars}</div>
-<div class="axis"><span>90일 전</span><span>${esc(mid)}</span><span>오늘</span></div></div>`;
+<div class="axis"><span>90일 전</span><span class="up">${esc(mid)}</span><span>오늘</span></div>
+</div>`;
   }).join('\n');
 
   const pastHtml = data.past.length
-    ? data.past.map((p) => `<div class="it">${esc(p.pastTitle)}<div class="t">${esc(fmtMd(p.created))} ${esc(fmtHm(p.created))} · ${esc(fmtMinutes((p.closed - p.created) / 60000))} 만에 해결</div></div>`).join('\n')
-    : '<div class="empty">최근 30일 동안 문제가 없었어요.</div>';
+    ? `<ul class="past">${data.past.map((p) => `<li>${icon('ok')}<div><b>${esc(p.pastTitle)}</b><span>${esc(fmtMd(p.created))} ${esc(fmtHm(p.created))} · ${esc(fmtMinutes((p.closed - p.created) / 60000))} 만에 해결</span></div></li>`).join('\n')}</ul>`
+    : '<p class="empty">최근 30일 동안 문제가 없었어요.</p>';
 
+  // 색·글꼴·모서리·테두리는 하입나우 프론트(celfit-front src/app/globals.css, components/ui/*)의 값을 그대로 쓴다.
   const css = `
-:root{--pink:#ec4899;--ink:#0f172a;--sub:#475569;--mute:#94a3b8;--line:#e2e8f0;--bg:#f8fafc;
---ok:#16a34a;--ok-bg:#f0fdf4;--bad:#dc2626;--bad-bg:#fef2f2;--warn:#d97706;--warn-bg:#fffbeb;--info:#2563eb;--info-bg:#eff6ff}
+:root{--hn-50:#fdeef6;--hn-400:#ec4899;--hn-500:#d61f7f;
+--s900:#0f172a;--s800:#1e293b;--s700:#334155;--s600:#475569;--s500:#64748b;--s400:#94a3b8;--s300:#cbd5e1;--s200:#e2e8f0;--s100:#f1f5f9;--s50:#f8fafc;
+--ok:#10b981;--ok-bar:#34d399;--ok-t:#059669;--ok-50:#ecfdf5;--bad:#f43f5e;--bad-t:#e11d48;--bad-50:#fff1f2;
+--warn:#f59e0b;--warn-t:#d97706;--warn-50:#fffbeb;--info:#0ea5e9;--info-t:#0284c7;--info-50:#f0f9ff;
+--sans:"Poppins","Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+--mono:"Geist Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%;color-scheme:light}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Noto Sans KR","Malgun Gothic",sans-serif;-webkit-font-smoothing:antialiased;overflow-wrap:anywhere;word-break:keep-all}
-.wrap{max-width:720px;margin:0 auto;padding:0 16px 48px}
-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:20px 0}
-.brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:17px}
-.logo{width:28px;height:28px;border-radius:8px;flex:none}
-.back{font-size:14px;color:var(--sub);text-decoration:none;white-space:nowrap}
-.hero{border-radius:16px;padding:22px 22px 18px;margin-top:4px;border:1px solid}
-.hero.ok{background:var(--ok-bg);border-color:#bbf7d0}.hero.bad{background:var(--bad-bg);border-color:#fecaca}.hero.info{background:var(--info-bg);border-color:#bfdbfe}.hero.warn{background:var(--warn-bg);border-color:#fde68a}
-.hero h1{margin:0;font-size:21px;line-height:1.4;display:flex;gap:10px;align-items:center}
-.dot{width:12px;height:12px;border-radius:50%;flex:none}
-.ok .dot,.dot.ok{background:var(--ok)}.bad .dot,.dot.bad{background:var(--bad)}.warn .dot,.dot.warn{background:var(--warn)}.info .dot,.dot.info{background:var(--info)}
-.hero p{margin:10px 0 0;color:var(--sub);font-size:15px;line-height:1.6}
-.hero .meta{margin-top:14px;font-size:13px;color:var(--mute)}
-h2{font-size:15px;margin:32px 0 12px;color:var(--sub);font-weight:600}
-.card{background:#fff;border:1px solid var(--line);border-radius:14px}
-.inc{padding:20px;margin-bottom:12px;--c:var(--info)}
-.inc.bad{--c:var(--bad)}.inc.warn{--c:var(--warn)}
-.inc .top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
-.inc h3{margin:0;font-size:17px;line-height:1.4}
-.pill{font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;white-space:nowrap}
-.pill.bad{background:var(--bad-bg);color:var(--bad)}.pill.ok{background:var(--ok-bg);color:var(--ok)}.pill.warn{background:var(--warn-bg);color:var(--warn)}.pill.info{background:var(--info-bg);color:var(--info)}
-.steps{display:flex;margin:18px 0 6px;gap:4px}
-.step{flex:1;text-align:center;font-size:12px;color:var(--mute)}
-.step i{display:block;height:4px;border-radius:2px;background:var(--line);margin-bottom:6px}
-.step.done i{background:var(--c)}.step.done{color:var(--ink);font-weight:600}
-.step.now{color:var(--c);font-weight:700}
-.box{background:var(--bg);border-radius:10px;padding:14px 16px;margin-top:14px;font-size:14px;line-height:1.65}
-.box b{display:block;font-size:13px;color:var(--sub);margin-bottom:4px}
-.box ul{margin:0;padding-left:18px}
-.box .prose{margin-top:8px}
+body{margin:0;background:#fff;color:var(--s900);font:400 14px/1.6 var(--sans);-webkit-font-smoothing:antialiased;word-break:keep-all;overflow-wrap:break-word}
+a{color:inherit}
+.wrap{max-width:768px;margin:0 auto;padding:0 20px}
+.top{position:relative;border-bottom:1px solid var(--s200)}
+.top:before{content:"";position:absolute;inset:0;background-image:radial-gradient(circle,rgba(15,23,42,.08) 1px,transparent 1px);background-size:22px 22px;-webkit-mask-image:linear-gradient(#000,transparent 85%);mask-image:linear-gradient(#000,transparent 85%);pointer-events:none}
+.top>*{position:relative}
+.nav{display:flex;align-items:center;justify-content:space-between;gap:12px;height:64px}
+.brand{display:flex;align-items:center;gap:6px;text-decoration:none;min-width:0}
+.brand img{display:block;height:28px;width:auto}
+.brand .sfx{margin-left:6px;padding-left:10px;border-left:1px solid var(--s200);font-size:14px;font-weight:600;color:var(--s500);white-space:nowrap;line-height:20px}
+.back{display:inline-flex;align-items:center;gap:2px;font-size:14px;font-weight:500;color:var(--s700);text-decoration:none;white-space:nowrap}
+.back:hover{color:var(--hn-500)}
+.chev{width:16px;height:16px}
+.back .long{margin-right:.3em}
+.hero{padding:40px 0 36px}
+.hero-t{display:flex;gap:16px;align-items:center}
+.hero .ic{width:28px;height:28px;border-radius:50%}
+.hero.ok .ic{box-shadow:0 0 0 6px var(--ok-50)}.hero.bad .ic{box-shadow:0 0 0 6px var(--bad-50)}.hero.warn .ic{box-shadow:0 0 0 6px var(--warn-50)}.hero.info .ic{box-shadow:0 0 0 6px var(--info-50)}
+.hero h1{margin:0;font-size:26px;line-height:1.35;font-weight:700;letter-spacing:-.01em}
+.hero p{margin:8px 0 0 44px;font-size:15px;line-height:1.65;color:var(--s600);max-width:600px}
+.hero .meta{margin-top:14px;font-size:13px;color:var(--s400)}
+.ic{flex:none;display:block;width:18px;height:18px}
+.ic.ok{color:var(--ok)}.ic.bad{color:var(--bad)}.ic.warn{color:var(--warn)}.ic.info{color:var(--info)}
+main{padding-bottom:8px}
+.sec{margin-top:36px}
+.sec-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:12px}
+.sec h2{margin:0;font-size:16px;font-weight:700;line-height:1.4}
+.sec-m{font-size:13px;color:var(--s400)}
+.card{background:#fff;border:1px solid var(--s200);border-radius:12px;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+.card+.card{margin-top:12px}
+.card-h{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:18px 20px 0}
+.card-h h3{margin:0;font-size:17px;font-weight:700;line-height:1.45}
+.mt .card-h{padding-bottom:16px}
+.pill{flex:none;margin-top:2px;font-size:12px;font-weight:500;line-height:18px;padding:2px 10px;border-radius:999px;white-space:nowrap}
+.pill.bad{background:var(--bad-50);color:var(--bad-t)}.pill.ok{background:var(--ok-50);color:var(--ok-t)}.pill.warn{background:var(--warn-50);color:var(--warn-t)}.pill.info{background:var(--info-50);color:var(--info-t)}
+.inc{--c:var(--bad)}.inc.warn{--c:var(--warn)}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;list-style:none;margin:16px 20px 18px;padding:0}
+.steps li{padding-top:8px;border-top:3px solid var(--s100);font-size:12px;line-height:1.4;color:var(--s400)}
+.steps li.done{border-top-color:var(--c);color:var(--s700)}
+.steps li.now{color:var(--c);font-weight:600}
+.field{display:grid;grid-template-columns:148px 1fr;gap:16px;padding:16px 20px;border-top:1px solid var(--s100)}
+.lbl{font-size:13px;font-weight:500;color:var(--s500);line-height:22px}
+.val{min-width:0;font-size:14px;line-height:22px;color:var(--s800)}
+.when{font-weight:500}.dur{margin-left:8px;color:var(--s500)}
+.list{margin:0;padding:0;list-style:none}
+.list li{position:relative;padding-left:14px}
+.list li+li{margin-top:4px}
+.list li:before{content:"";position:absolute;left:2px;top:10px;width:4px;height:4px;border-radius:50%;background:var(--s300)}
+.prose{color:var(--s600)}
+.list+.prose{margin-top:8px}
 .prose>:first-child{margin-top:0}.prose>:last-child{margin-bottom:0}
-.prose img{max-width:100%;height:auto}
-.prose pre{overflow:auto;background:#fff;padding:8px;border-radius:8px}
-.tl{margin:16px 0 0 4px;padding:0;list-style:none;border-left:2px solid var(--line)}
-.tl li{position:relative;padding:0 0 14px 16px;font-size:14px;line-height:1.6}
+.prose img,.tx img{max-width:100%;height:auto}
+.prose pre,.tx pre{overflow:auto;background:var(--s50);padding:8px;border-radius:8px}
+.tl{margin:0;padding:0;list-style:none}
+.tl li{position:relative;padding:0 0 16px 18px}
 .tl li:last-child{padding-bottom:0}
-.tl li:before{content:"";position:absolute;left:-6px;top:6px;width:10px;height:10px;border-radius:50%;background:#fff;border:2px solid var(--mute)}
-.tl li.cur:before{border-color:var(--c);background:var(--c)}
-.tl .t{font-size:12px;color:var(--mute)}.tl .s{font-weight:700;margin-right:6px}
-.tl .tx{margin-top:2px}.tl .tx p{margin:0 0 4px}.tl .tx>:last-child{margin-bottom:0}
-.tl .tx img{max-width:100%;height:auto}
-.svc{padding:18px 20px;border-top:1px solid var(--line)}.svc:first-child{border-top:0}
-.svc .row{display:flex;justify-content:space-between;align-items:center;gap:10px}
-.svc .name{font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px}
-.svc .desc{font-size:13px;color:var(--sub);margin:4px 0 12px 20px}
-.st{font-size:13px;font-weight:700;white-space:nowrap}.st.ok{color:var(--ok)}.st.bad{color:var(--bad)}.st.warn{color:var(--warn)}.st.info{color:var(--info)}
-.bars{display:flex;gap:2px;height:28px;margin-left:20px}
-.bars span{flex:1;min-width:0;border-radius:2px;background:#22c55e}
-.bars span.none{background:#eef2f7}.bars span.bad{background:var(--bad)}.bars span.warn{background:#f59e0b}
-.axis{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--mute);margin:6px 0 0 20px}
-.past{padding:4px 20px}
-.past .it{padding:14px 0;border-top:1px solid var(--line);font-size:14px}.past .it:first-child{border-top:0}
-.past .it .t{font-size:12px;color:var(--mute);margin-top:3px}
-.empty{padding:18px 0;color:var(--sub);font-size:14px}
-.help{margin-top:28px;padding:18px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:14px}
-.btn{background:var(--pink);color:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:10px 14px;border-radius:10px;white-space:nowrap}
-footer{margin-top:20px;font-size:12px;color:var(--mute);line-height:1.7;text-align:center}
-@media (max-width:420px){.hero{padding:18px 16px 14px}.hero h1{font-size:19px}.inc{padding:16px}.svc{padding:16px}.past{padding:4px 16px}.help{padding:16px;flex-direction:column;align-items:stretch;text-align:center}.axis{font-size:11px}}`;
+.tl li:before{content:"";position:absolute;left:0;top:8px;width:7px;height:7px;border-radius:50%;background:var(--s300)}
+.tl li:after{content:"";position:absolute;left:3px;top:20px;bottom:2px;width:1px;background:var(--s200)}
+.tl li:last-child:after{display:none}
+.tl li.cur:before{background:var(--c);box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 18%,transparent)}
+.tl-h{display:flex;align-items:baseline;gap:8px}
+.tl-h b{font-weight:600;color:var(--s900)}
+.tl li.cur .tl-h b{color:var(--c)}
+time{font-family:var(--mono);font-size:12px;color:var(--s400)}
+.tx{color:var(--s600);margin-top:2px}.tx p{margin:0 0 4px}.tx>:last-child{margin-bottom:0}
+.svc{padding:18px 20px 16px}
+.svc+.svc{border-top:1px solid var(--s100)}
+.svc-h{display:flex;align-items:flex-start;gap:10px}
+.svc-h .ic{margin-top:2px}
+.svc-n{flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:baseline;column-gap:10px}
+.svc-n b{font-size:15px;font-weight:600;line-height:22px}
+.svc-n span{font-size:13px;color:var(--s500);line-height:20px}
+.st{flex:none;font-size:13px;font-weight:600;line-height:22px}
+.st.ok{color:var(--ok-t)}.st.bad{color:var(--bad-t)}.st.warn{color:var(--warn-t)}.st.info{color:var(--info-t)}
+.bars{display:flex;gap:2px;height:26px;margin-top:14px}
+.bars span{position:relative;flex:1;min-width:0;border-radius:2px;background:var(--ok-bar)}
+.bars span.none{background:var(--s100)}.bars span.bad{background:var(--bad)}.bars span.warn{background:var(--warn)}
+.bars span:hover{filter:brightness(.88)}
+.bars span:hover:after{content:attr(data-tip);position:absolute;z-index:2;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);padding:5px 9px;border-radius:6px;background:var(--s900);color:#fff;font-size:12px;font-weight:500;line-height:1.4;white-space:nowrap;pointer-events:none}
+.bars span:nth-child(-n+15):hover:after{left:0;transform:none}
+.bars span:nth-last-child(-n+15):hover:after{left:auto;right:0;transform:none}
+.axis{display:flex;justify-content:space-between;gap:8px;margin-top:8px;font-size:12px;color:var(--s400)}
+.axis .up{color:var(--s600);font-weight:500}
+.past{margin:0;padding:0 20px;list-style:none;border:1px solid var(--s200);border-radius:12px}
+.past li{display:flex;gap:10px;padding:14px 0}
+.past li+li{border-top:1px solid var(--s100)}
+.past .ic{margin-top:2px;width:16px;height:16px}
+.past b{display:block;font-weight:500;line-height:20px}
+.past span{display:block;font-size:12px;color:var(--s400);margin-top:2px}
+.empty{margin:0;padding:16px 20px;border:1px solid var(--s200);border-radius:12px;color:var(--s500)}
+.help{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:40px;padding:18px 20px;border-radius:12px;background:var(--s50)}
+.help p{margin:0;color:var(--s700)}
+.help p a{font-weight:600;color:var(--s900);text-decoration:none;border-bottom:1px solid var(--s300)}
+.btn{flex:none;display:inline-flex;align-items:center;justify-content:center;height:40px;padding:0 16px;border-radius:8px;background:var(--hn-400);color:#fff;font-size:14px;font-weight:500;text-decoration:none;white-space:nowrap}
+.btn:hover{background:var(--hn-500)}
+footer{margin-top:28px;padding:18px 0 40px;border-top:1px solid var(--s100);font-size:12px;color:var(--s400);line-height:1.7}
+@media (max-width:560px){
+.wrap{padding:0 16px}
+.nav{height:56px}
+.brand img{height:22px}
+.brand .sfx{font-size:13px;margin-left:4px;padding-left:8px}
+.back{font-size:13px}
+.back .long{display:none}
+.hero{padding:28px 0 26px}
+.hero-t{gap:12px}
+.hero .ic{width:24px;height:24px}
+.hero h1{font-size:20px}
+.hero p{margin-left:0;font-size:14px}
+.hero p.meta{margin-top:12px}
+.sec{margin-top:30px}
+.card-h{padding:16px 16px 0}
+.card-h h3{font-size:16px}
+.steps{margin:14px 16px 16px}
+.field{grid-template-columns:1fr;gap:6px;padding:14px 16px}
+.lbl{line-height:20px}
+.svc{padding:16px}
+.svc-n{display:block}
+.svc-n span{display:block}
+.bars{gap:1px;height:24px}
+.bars span{border-radius:1px}
+.bars span:nth-child(-n+30):hover:after{left:0;transform:none}
+.bars span:nth-last-child(-n+30):hover:after{left:auto;right:0;transform:none}
+.past{padding:0 16px}
+.empty{padding:14px 16px}
+.help{flex-direction:column;align-items:stretch;padding:16px}
+}`;
 
-  const incidentSection = views.length ? `<h2>진행 중인 문제</h2>\n${views.map(incidentCard).join('\n')}` : '';
+  const incidentSection = views.length ? section('진행 중인 문제', views.map(incidentCard).join('\n')) : '';
   const sections = [
     maintSection(data.maintenance.filter((m) => m.ongoing), '진행 중인 점검'),
     incidentSection,
     maintSection(data.maintenance.filter((m) => !m.ongoing), '예정된 점검'),
-    `<h2>기능별 상태</h2>\n<div class="card">${svcRows}</div>`,
-    `<h2>지난 문제 (최근 30일)</h2>\n<div class="card past">${pastHtml}</div>`,
+    section('기능별 상태', `<div class="card">${svcRows}</div>`),
+    section('지난 문제', pastHtml, '최근 30일'),
   ].filter(Boolean).join('\n');
+  const mail = `mailto:${SUPPORT_EMAIL}`;
 
   return `<!doctype html>
 <html lang="ko">
@@ -618,20 +721,27 @@ footer{margin-top:20px;font-size:12px;color:var(--mute);line-height:1.7;text-ali
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="refresh" content="300">
-<meta name="theme-color" content="#ec4899">
+<meta name="theme-color" content="#ffffff">
 <meta name="description" content="${esc(INTRO)}">
 <title>${esc(SITE_NAME)}</title>
-<link rel="icon" href="${LOGO}">
+<link rel="icon" type="image/png" href="${LOGO_STAR}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="${FONT_CSS}">
 <style>${css}</style>
 </head>
 <body>
+<div class="top">
 <div class="wrap">
-<header><div class="brand"><img class="logo" src="${LOGO}" alt="" width="28" height="28">${esc(SITE_NAME)}</div><a class="back" href="${HOME_URL}">하입나우로 돌아가기 →</a></header>
-<div class="hero ${hero.cls}" role="status"><h1><span class="dot"></span>${esc(hero.title)}</h1><p>${esc(hero.desc)}</p><div class="meta">마지막 확인 ${esc(fmtHm(lastCheckMs))} · 5분마다 자동으로 확인해요</div></div>
-${sections}
-<div class="card help"><span>문제가 계속되거나 여기 없는 문제를 겪고 있다면 알려 주세요.</span><a class="btn" href="${esc(HELP_URL)}">문의하기</a></div>
-<footer>이 페이지는 하입나우 서버와 따로 운영돼요. 하입나우가 멈춰도 이곳은 열려요.</footer>
+<header class="nav"><a class="brand" href="${HOME_URL}" aria-label="하입나우 홈"><img src="${LOGO_STAR}" alt="" width="28" height="28"><img src="${LOGO_WORDMARK}" alt="hypenow" width="101" height="28"><span class="sfx">서비스 상태</span></a><a class="back" href="${HOME_URL}"><span class="long">하입나우로</span>돌아가기${CHEVRON}</a></header>
+<div class="hero ${hero.cls}" role="status"><div class="hero-t">${icon(hero.cls)}<h1>${esc(hero.title)}</h1></div><p>${esc(hero.desc)}</p><p class="meta">마지막 확인 ${esc(fmtHm(lastCheckMs))} · 5분마다 자동으로 확인해요</p></div>
 </div>
+</div>
+<main class="wrap">
+${sections}
+<div class="help"><p>문제가 계속되거나 여기 없는 문제를 겪고 있다면 <a href="${mail}">${esc(SUPPORT_EMAIL)}</a>로 알려 주세요.</p><a class="btn" href="${mail}">메일 보내기</a></div>
+<footer>이 페이지는 하입나우 서버와 따로 운영돼요. 하입나우가 멈춰도 이곳은 열려요.</footer>
+</main>
 </body>
 </html>
 `;
