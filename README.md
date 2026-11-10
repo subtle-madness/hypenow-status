@@ -2,7 +2,7 @@
 
 공개 상태 페이지: https://status.hypenow.io
 
-GitHub Actions가 5분마다 아래 주소에 바깥에서 접속해 정상 여부를 기록하고, GitHub Pages에 상태 페이지를 올린다.
+GitHub Actions가 5분마다 아래 주소에 바깥에서 접속해 정상 여부를 기록하고, 그 기록과 이슈를 읽어 완성된 정적 HTML을 만들어 GitHub Pages(`gh-pages` 브랜치, 매번 고아 커밋 1개로 덮어씀)에 올린다.
 우리 서버(오라클)와 따로 돌기 때문에 서버가 통째로 죽어도 이 페이지는 열린다. 설정은 [`.upptimerc.yml`](.upptimerc.yml) 하나다.
 
 | 표시 이름   | 점검 주소                         | 의미                                   |
@@ -18,6 +18,13 @@ GitHub Actions가 5분마다 아래 주소에 바깥에서 접속해 정상 여�
 - **장애 공지 직접 올리기**: Issues → New issue → "장애 공지" 양식. 라벨 `status`가 붙어야 페이지에 뜬다.
   소식은 댓글로 이어 쓰고, 해결되면 이슈를 닫는다.
 - **점검 예고**: "정기 점검 예정" 양식. 시각은 UTC로 쓴다.
+- **화면 생성 구조**: Upptime 기본 화면(브라우저가 GitHub API를 부르는 방식, 같은 IP에서 시간당 60회 제한)은 쓰지 않는다.
+  [`site.yml`](.github/workflows/site.yml)이 [`build-site.mjs`](.github/scripts/build-site.mjs)로 HTML을 미리 만들어 올리므로 방문자 수와 무관하게 제한이 없다.
+  점검 기록·자동 장애 이슈 반영은 점검 워크플로 종료 직후, 공지 이슈·댓글은 1~2분 안에 반영된다(안전망으로 30분마다도 돈다).
+  수동 갱신: Actions → Static Site CI → Run workflow.
+- **페이지에 실리는 이슈**: 라벨 `status`/`maintenance`가 붙고, 작성자가 저장소 소유자·멤버·협업자이거나 Actions 봇인 것만 싣는다.
+  **외부인이 연 이슈와 댓글은 라벨이 붙어도 싣지 않는다.** 자동 장애 이슈는 제목·본문을 고정 한국어 문구로 바꿔 보여주고 봇 댓글은 싣지 않는다.
+  로직 시험: `node --test .github/scripts/build-site.test.mjs`
 - **5분 주기 한계**: GitHub 예약 실행은 바쁠 때 몇 분씩 밀릴 수 있다. 팀이 즉시 받는 알림은 기존 Discord 알림이 맡는다.
 
 <!--start: status pages-->
@@ -34,4 +41,4 @@ GitHub Actions가 5분마다 아래 주소에 바깥에서 접속해 정상 여�
 
 [**Visit our status website →**](https://status.hypenow.io)
 
-[Upptime](https://upptime.js.org)(MIT) 기반. 템플릿 자동 갱신은 껐다(조직 정책상 기본 토큰이 워크플로 파일을 못 고치고, 갱신이 워크플로에 적은 권한 설정을 지운다). 버전은 워크플로의 `upptime/uptime-monitor@v1.46.5`에 고정.
+[Upptime](https://upptime.js.org)(MIT) 기반. 화면 빌드(`site.yml`)는 Upptime 것을 쓰지 않고 위 생성기로 대체했다. 템플릿 자동 갱신은 껐다(조직 정책상 기본 토큰이 워크플로 파일을 못 고치고, 갱신이 워크플로에 적은 권한 설정을 지운다). 버전은 워크플로의 `upptime/uptime-monitor@v1.46.5`에 고정.
