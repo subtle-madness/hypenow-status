@@ -183,6 +183,18 @@ const apiAll = async (path, token) => {
   return out;
 };
 
+// 마지막 점검 시각: history/*.yml의 lastUpdated는 상태가 바뀔 때만 갱신되므로,
+// 가장 최근에 성공한 Uptime CI 실행 시각을 쓴다(실패하면 호출자가 폴백).
+const lastCheckFromRuns = async () => {
+  if (process.env.FIXTURE_FILE) return null;
+  try {
+    const repo = process.env.GITHUB_REPOSITORY || 'subtle-madness/hypenow-status';
+    const r = await api(`/repos/${repo}/actions/workflows/uptime.yml/runs?status=success&per_page=1`, process.env.GITHUB_TOKEN, 1);
+    const t = Date.parse(r.workflow_runs?.[0]?.updated_at);
+    return Number.isNaN(t) ? null : t;
+  } catch { return null; }
+};
+
 const loadIssues = async (nowMs) => {
   if (process.env.FIXTURE_FILE) {
     const f = JSON.parse(readFileSync(process.env.FIXTURE_FILE, 'utf8'));
@@ -392,7 +404,7 @@ export const build = async ({ root = process.cwd(), out = join(process.cwd(), '_
   const summary = JSON.parse(readFileSync(join(root, 'history', 'summary.json'), 'utf8'));
   const metas = Object.fromEntries(sites.map((s) => [s.slug, readHistoryMeta(root, s.slug)]));
   const lasts = Object.values(metas).map((m) => Date.parse(m.lastUpdated)).filter((n) => !Number.isNaN(n));
-  const lastCheckMs = lasts.length ? Math.max(...lasts) : nowMs;
+  const lastCheckMs = (await lastCheckFromRuns()) ?? (lasts.length ? Math.max(...lasts) : nowMs);
   const { issues, comments } = await loadIssues(nowMs);
   const data = classify(issues, sites, nowMs);
   const repo = process.env.GITHUB_REPOSITORY || 'subtle-madness/hypenow-status';
