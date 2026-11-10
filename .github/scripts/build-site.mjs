@@ -144,6 +144,8 @@ const STAGE_SENTENCE = [
 const BOT_START_TEXT = '자동 점검에서 문제를 발견해 살펴보고 있어요.';
 const GROUP_WINDOW = 15 * 60000;
 
+// api(로그인·기능 이용)가 영향에 있으면 data(정보 불러오기)는 그 증상에 포함되므로 안내 문구에서는 뺀다.
+export const messageSlugs = (slugs) => (slugs.includes('api') ? slugs.filter((s) => s !== 'data') : slugs);
 const slugRank = (s) => { const i = SLUG_ORDER.indexOf(s); return i < 0 ? 99 : i; };
 const bySlugOrder = (a, b) => slugRank(a) - slugRank(b);
 // 설정에만 있고 문구 맵에 없는 slug도 깨지지 않게 이름으로 만든 기본 문구를 쓴다.
@@ -417,7 +419,7 @@ export const buildHero = ({ incidents, maintenance, nowMs, progress = {}, sites 
     return { cls: 'bad', title: inc.title, desc: `${when}${sum}. ${STAGE_SENTENCE[stageOf(inc)]}` };
   }
   const maintText = (m) => {
-    const lines = m.expectedDown.map((s) => svcText(s, sites).maint);
+    const lines = messageSlugs(m.expectedDown).map((s) => svcText(s, sites).maint);
     return lines.length ? lines.join('. ') : '일부 기능을 이용하기 어려울 수 있어요';
   };
   const ongoing = maintenance.find((m) => m.ongoing);
@@ -494,7 +496,7 @@ export const render = ({ sites, summary, metas, data, comments, nowMs, lastCheck
   const maintCard = (m) => {
     const sameDay = kstDate(m.start) === kstDate(m.end);
     const when = `${fmtMdW(m.start)} ${fmtHm(m.start)} ~ ${sameDay ? '' : fmtMdW(m.end) + ' '}${fmtHm(m.end)} · 약 ${fmtMinutes((m.end - m.start) / 60000)}`;
-    const items = m.expectedDown.map((s) => `<li>${esc(svcText(s, sites).maint)}</li>`).join('');
+    const items = messageSlugs(m.expectedDown).map((s) => `<li>${esc(svcText(s, sites).maint)}</li>`).join('');
     const extra = stripHtml(m.bodyHtml) ? `<div class="prose">${cleanHtml(m.bodyHtml)}</div>` : '';
     const inner = (items ? `<ul>${items}</ul>` : '') + extra;
     return `<div class="card inc">
@@ -509,7 +511,7 @@ ${inner ? box('이 시간에는', inner) : ''}
     const color = inc.kind === 'down' ? 'bad' : 'warn';
     const stage = pr.stage;
     const steps = STAGES.map((n, k) => `<div class="step${k <= stage ? ' done' : ''}${k === stage ? ' now' : ''}"><i></i>${n}</div>`).join('');
-    const symptoms = inc.kind === 'down' ? [...new Set(inc.slugs.flatMap((s) => svcText(s, sites).symptoms))] : [];
+    const symptoms = inc.kind === 'down' ? [...new Set(messageSlugs(inc.slugs).flatMap((s) => svcText(s, sites).symptoms))] : [];
     const tl = pr.entries.slice().reverse().map((e, k) => `<li${k === 0 ? ' class="cur"' : ''}><span class="s">${STAGES[e.stage]}</span><span class="t">${esc(fmtWhen(e.at, nowMs))}</span><div class="tx">${cleanHtml(e.html)}</div></li>`);
     const startText = inc.bot ? `<p>${esc(BOT_START_TEXT)}</p>` : cleanHtml(inc.bodyHtml);
     const startAt = inc.created != null ? `<span class="t">${esc(fmtWhen(inc.created, nowMs))}</span>` : '';

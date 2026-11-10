@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   classify, parseMaintenance, render, cleanHtml, isTrustedComment, parseStage, progressOf, buildHero,
-  aggregate90, fmtPct, fmtMinutes, fmtWhen,
+  aggregate90, fmtPct, messageSlugs, fmtMinutes, fmtWhen,
 } from './build-site.mjs';
 
 const sites = [
@@ -200,7 +200,7 @@ test('렌더: 정상 화면, GitHub API 호출 코드·스크립트 없음, 마�
   assert.ok(!html.includes('—'));
 });
 
-test('렌더: 묶인 장애 한 카드, 진행 단계·접두어 제거·증상 합집합', () => {
+test('렌더: 묶인 장애 한 카드, 진행 단계·접두어 제거·api 증상만', () => {
   const tdata = classify([
     botIssue({ number: 2, title: '🛑 a is down', created_at: '2026-11-10T04:00:00Z', labels: [{ name: 'status' }, { name: 'api' }] }),
     botIssue({ number: 3, title: '🛑 b is down', created_at: '2026-11-10T04:01:00Z', labels: [{ name: 'status' }, { name: 'data' }] }),
@@ -211,6 +211,22 @@ test('렌더: 묶인 장애 한 카드, 진행 단계·접두어 제거·증상 
   assert.equal((html.match(/class="card inc /g) || []).length, 1);
   assert.ok(html.includes('<span class="pill bad">원인 파악</span>'));
   assert.ok(html.includes('<p>접속 폭주예요</p>') && !html.includes('원인 파악: 접속'));
-  assert.ok(html.includes('찾기·랭킹 화면의 목록이 비어 보여요') && html.includes('로그인 버튼을 눌러도'));
+  assert.ok(!html.includes('찾기·랭킹 화면의 목록이 비어 보여요') && html.includes('로그인 버튼을 눌러도'));
   assert.ok(html.includes('자동 점검에서 문제를 발견해 살펴보고 있어요.'));
+});
+
+test('api가 영향에 있으면 data 증상·점검 문구는 뺀다(기능별 상태 행은 그대로)', () => {
+  assert.deepEqual(messageSlugs(['api', 'data']), ['api']);
+  assert.deepEqual(messageSlugs(['data']), ['data']);
+  const m = mt({ expectedDown: ['api', 'data'] });
+  const h = buildHero({ incidents: [], maintenance: [m], nowMs: NOW, sites });
+  assert.ok(h.desc.includes('로그인과 기능 이용이 잠시 멈춰요. 지금은'), h.desc);
+  assert.ok(!h.desc.includes('인플루언서'));
+  const tdata = { active: [inc({ slugs: ['api', 'data'] })], past: [], maintenance: [{ ...m, bodyHtml: '', ongoing: false }] };
+  const summary = sites.map((s) => ({ ...s, status: 'up', dailyMinutesDown: {} }));
+  const html = render({ sites, summary, metas: {}, data: tdata, comments: {}, nowMs: NOW, lastCheckMs: NOW });
+  assert.ok(!html.includes('찾기·랭킹 화면의 목록이 비어 보여요'));
+  assert.ok(!html.includes('<li>인플루언서·콘텐츠 정보를 잠시 불러올 수 없어요</li>'));
+  assert.ok(html.includes('<li>로그인과 기능 이용이 잠시 멈춰요</li>'));
+  assert.equal((html.match(/class="svc"/g) || []).length, 3);
 });
