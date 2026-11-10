@@ -22,6 +22,11 @@ on:
   schedule:
     - cron: "*/30 * * * *"
   workflow_dispatch:
+    inputs:
+      checked_at:
+        description: "점검이 끝난 시각(UTC ISO). 점검 실행이 넘겨준다"
+        required: false
+        default: ""
 # 겹치는 실행은 최신 것만 남긴다
 concurrency:
   group: ${{ github.repository }}-status-site
@@ -51,6 +56,7 @@ jobs:
       - name: Build site
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          CHECKED_AT: ${{ inputs.checked_at }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: node .github/scripts/build-site.mjs
       - name: Deploy to gh-pages (orphan, force push)

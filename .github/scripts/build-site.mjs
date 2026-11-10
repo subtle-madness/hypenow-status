@@ -404,7 +404,11 @@ export const build = async ({ root = process.cwd(), out = join(process.cwd(), '_
   const summary = JSON.parse(readFileSync(join(root, 'history', 'summary.json'), 'utf8'));
   const metas = Object.fromEntries(sites.map((s) => [s.slug, readHistoryMeta(root, s.slug)]));
   const lasts = Object.values(metas).map((m) => Date.parse(m.lastUpdated)).filter((n) => !Number.isNaN(n));
-  const lastCheckMs = (await lastCheckFromRuns()) ?? (lasts.length ? Math.max(...lasts) : nowMs);
+  // 점검 실행이 끝나며 부른 경우 그 점검 시각을 받는다(그 실행은 아직 성공 목록에 없다)
+  const checkedAt = Date.parse(process.env.CHECKED_AT || '');
+  const fromRuns = await lastCheckFromRuns();
+  const lastCheckMs = Math.max(Number.isNaN(checkedAt) ? 0 : checkedAt, fromRuns ?? 0)
+    || (lasts.length ? Math.max(...lasts) : nowMs);
   const { issues, comments } = await loadIssues(nowMs);
   const data = classify(issues, sites, nowMs);
   const repo = process.env.GITHUB_REPOSITORY || 'subtle-madness/hypenow-status';
