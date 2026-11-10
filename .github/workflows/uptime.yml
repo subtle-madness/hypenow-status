@@ -85,6 +85,11 @@ jobs:
     timeout-minutes: 5
     steps:
       # 같은 concurrency 그룹이라 대기 중인 실행은 하나만 남는다(이어 돌기가 둘로 늘지 않음)
+      # 이어 돌기 실행은 GITHUB_TOKEN으로 시작돼 workflow_run이 Static Site CI를 깨우지 못하므로 직접 부른다
+      - name: Rebuild status page
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run site.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}"
       - name: Dispatch next run
         env:
           GH_TOKEN: ${{ github.token }}
