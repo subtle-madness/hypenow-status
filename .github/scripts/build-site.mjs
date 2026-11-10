@@ -195,6 +195,28 @@ const lastCheckFromRuns = async () => {
   } catch { return null; }
 };
 
+// 조직 멤버십을 비공개로 둔 팀원은 Actions 토큰에 MEMBER가 아니라 CONTRIBUTOR/NONE으로 보인다.
+// 그래서 소속 표시로 못 믿는 작성자는 저장소 쓰기 권한을 직접 물어 확인하고, 확인되면 COLLABORATOR로 고쳐 둔다.
+const WRITE_PERMISSIONS = new Set(['admin', 'maintain', 'write']);
+const permissionChecker = (repo, token) => {
+  const cache = new Map();
+  return async (items) => {
+    for (const it of items) {
+      const login = it.user?.login;
+      if (!login || login === BOT_LOGIN || TRUSTED.has(it.author_association)) continue;
+      if (!cache.has(login)) {
+        let ok = false;
+        try {
+          const r = await api(`/repos/${repo}/collaborators/${encodeURIComponent(login)}/permission`, token, 1);
+          ok = WRITE_PERMISSIONS.has(r.permission);
+        } catch { ok = false; }
+        cache.set(login, ok);
+      }
+      if (cache.get(login)) it.author_association = 'COLLABORATOR';
+    }
+  };
+};
+
 const loadIssues = async (nowMs) => {
   if (process.env.FIXTURE_FILE) {
     const f = JSON.parse(readFileSync(process.env.FIXTURE_FILE, 'utf8'));
@@ -206,11 +228,14 @@ const loadIssues = async (nowMs) => {
   const since = new Date(nowMs - 35 * DAY).toISOString();
   const open = await apiAll(`/repos/${repo}/issues?state=open`, token);
   const closed = await apiAll(`/repos/${repo}/issues?state=closed&since=${since}`, token);
+  const trustByPermission = permissionChecker(repo, token);
+  await trustByPermission([...open, ...closed]);
   // 열린 장애 공지의 댓글만 가져온다(사람 댓글만 쓴다).
   const comments = {};
   for (const i of open) {
     if (!isTrustedIssue(i) || isBotIssue(i) || !labelNames(i).includes('status')) continue;
     comments[i.number] = await apiAll(`/repos/${repo}/issues/${i.number}/comments`, token);
+    await trustByPermission(comments[i.number]);
   }
   return { issues: [...open, ...closed], comments, repo };
 };
