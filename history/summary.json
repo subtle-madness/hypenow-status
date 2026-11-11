@@ -11,7 +11,7 @@
     "uptimeMonth": "100.00%",
     "uptimeYear": "100.00%",
     "time": 727,
-    "timeDay": 859,
+    "timeDay": 0,
     "timeWeek": 727,
     "timeMonth": 727,
     "timeYear": 727,
@@ -29,7 +29,7 @@
     "uptimeMonth": "100.00%",
     "uptimeYear": "100.00%",
     "time": 434,
-    "timeDay": 487,
+    "timeDay": 0,
     "timeWeek": 434,
     "timeMonth": 434,
     "timeYear": 434,
@@ -40,17 +40,19 @@
     "url": "https://api.hypenow.io/v1/stats",
     "icon": "https://icons.duckduckgo.com/ip3/api.hypenow.io.ico",
     "slug": "data",
-    "status": "up",
+    "status": "down",
     "uptime": "100.00%",
-    "uptimeDay": "100.00%",
+    "uptimeDay": "99.99%",
     "uptimeWeek": "100.00%",
     "uptimeMonth": "100.00%",
     "uptimeYear": "100.00%",
-    "time": 425,
-    "timeDay": 484,
-    "timeWeek": 425,
-    "timeMonth": 425,
-    "timeYear": 425,
-    "dailyMinutesDown": {}
+    "time": 807,
+    "timeDay": 3480,
+    "timeWeek": 807,
+    "timeMonth": 807,
+    "timeYear": 807,
+    "dailyMinutesDown": {
+      "2026-11-11": 0
+    }
   }
 ]
