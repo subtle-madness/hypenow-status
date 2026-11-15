@@ -40,19 +40,20 @@
     "url": "https://api.hypenow.io/v1/stats",
     "icon": "https://icons.duckduckgo.com/ip3/api.hypenow.io.ico",
     "slug": "data",
-    "status": "down",
-    "uptime": "99.97%",
-    "uptimeDay": "100.00%",
-    "uptimeWeek": "99.95%",
-    "uptimeMonth": "99.97%",
-    "uptimeYear": "99.97%",
-    "time": 1037,
-    "timeDay": 3474,
-    "timeWeek": 1642,
-    "timeMonth": 1037,
-    "timeYear": 1037,
+    "status": "up",
+    "uptime": "99.94%",
+    "uptimeDay": "99.68%",
+    "uptimeWeek": "99.91%",
+    "uptimeMonth": "99.94%",
+    "uptimeYear": "99.94%",
+    "time": 988,
+    "timeDay": 1986,
+    "timeWeek": 1451,
+    "timeMonth": 988,
+    "timeYear": 988,
     "dailyMinutesDown": {
-      "2026-11-11": 5
+      "2026-11-11": 5,
+      "2026-11-15": 5
     }
   }
 ]
