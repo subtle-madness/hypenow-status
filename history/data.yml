@@ -1,7 +1,7 @@
 url: https://api.hypenow.io/v1/stats
-status: down
-code: 500
-responseTime: 3492
-lastUpdated: 2026-11-28T07:56:18.617Z
+status: up
+code: 200
+responseTime: 571
+lastUpdated: 2026-11-28T08:00:59.046Z
 startTime: 2026-11-04T11:25:35.732Z
 generator: Upptime <https://github.com/upptime/upptime>
